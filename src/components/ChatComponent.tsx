@@ -36,11 +36,11 @@ const questions = [
   },
   {
     key: 'job',
-    text: 'What job are you applying for, and where?',
+    text: 'What job are you applying for, and where is it located?',
   },
   {
     key: 'experience',
-    text: 'Can you tell me about your work experience — or share your resume if you have one?',
+    text: 'Can you tell me about your work experience?',
   },
   {
     key: 'company',
@@ -66,6 +66,7 @@ const ChatComponent: React.FunctionComponent = () => {
   const [currentQuestionIndex, setCurrentQuestionIndex] = React.useState(0);
   const { messages, sendMessage, addMessage } = useChatbot();
   const ref = useChatScroll(messages);
+  const [clippyState, setClippyState] = React.useState<'idle' | 'thinking' | 'talking'>('idle');
   const initialLoadRef = React.useRef(true);
 
   React.useEffect(() => {
@@ -115,10 +116,12 @@ const ChatComponent: React.FunctionComponent = () => {
     const currentQuestion = questions[currentQuestionIndex];
 
     addMessage({ text: input, sender: 'user' });
-    setAnswers((prev) => ({ ...prev, [currentQuestion.key]: input }));
+    const updatedAnswers = { ...answers, [currentQuestion.key]: input };
+    setAnswers(updatedAnswers);
     setInput("");
-
+    
     const nextIndex = currentQuestionIndex + 1;
+    
     if (nextIndex < questions.length) {
       setTimeout(() => {
         addMessage({
@@ -128,56 +131,67 @@ const ChatComponent: React.FunctionComponent = () => {
         setCurrentQuestionIndex(nextIndex);
       }, 500);
     } else {
-
       const prompt = `
-      Write a Microsoft Word-style cover letter using the information below.
+      You are a helpful assistant generating a cover letter for a job seeker.
       
-      Start the letter with a formatted contact block that includes only the provided information — do not include placeholder text like [Your Name] or [Date]. Just write it out like a real letter.
+      Please write a polished, professional, and friendly cover letter using the following details:
       
-      ${answers.name}
-      ${answers.address}
-      ${answers.cityStateZip}
-      ${answers.email}
-      ${answers.phone}
-      ${new Date().toLocaleDateString()}
+      Name: ${answers.name}
+      Address: ${answers.address}
+      City/State/Zip: ${answers.cityStateZip}
+      Email: ${answers.email}
+      Phone: ${answers.phone}
+      Date: ${new Date().toLocaleDateString()}
       
-      Then write the greeting like: "Dear ${answers.company} Hiring Team,"
+      Job Title: ${answers.job}
+      Company: ${answers.company}
+      Location: (if included in job field): ${answers.job.includes(" at ") ? "" : answers.company}
       
-      Include the following points in the body:
+      Experience: ${answers.experience}
+      Why it's a good fit: ${answers.fit}
+      Tone: ${answers.tone || "professional and friendly"}
       
-      - Job: ${answers.job}
-      - Experience: ${answers.experience}
-      - Fit: ${answers.fit}
+      Make sure the final letter flows like a real human wrote it. Start with their contact info, then the greeting (e.g., “Dear Hiring Manager,”), followed by the body, and a closing paragraph with their name at the end.
       
-      Use a tone that is ${answers.tone}. Keep it professional and friendly.
-      
-      End the letter with a closing and the name: ${answers.name}
+      Do not include placeholders like [Your Name] — fill everything in. Keep the formatting appropriate for a Microsoft Word-style letter.
       `;
+    
+      setClippyState('thinking');
+    
       sendMessage(prompt).then((botReply) => {
         if (botReply) {
+          setClippyState('talking');
+          setTimeout(() => setClippyState('idle'), 2000);
           generatePdfFromText(botReply);
+        } else {
+          setClippyState('idle');
         }
       });
     }
   };
 
   return (
-    <div className="flex flex-col h-[80vh] bg-white">
-      {/* Header */}
-      <h2 className="p-4 font-semibold text-lg text-center bg-blue-100 flex text-blue-800 justify-center items-center gap-2">
-        Cover Letter Generator <LuBot size={25} />
-      </h2>
+    <div className="flex flex-col h-[80vh] w-full max-w-xl mx-auto bg-[#d4d0c8] border border-gray-600 shadow-[inset_-2px_-2px_0px_#fff,inset_2px_2px_0px_#808080] font-[Tahoma,sans-serif] text-sm">
+<div className="bg-[#0a246a] h-8 text-white px-3 py-1 text-sm font-bold flex items-center gap-2 shadow-[inset_-1px_-1px_0px_#000,inset_1px_1px_0px_#fff]">
+  <LuBot size={18} className="text-white" />
+  Clippy 2.0 Cover Letter Helper
+</div>
 
       {/* Chat Messages */}
       <div ref={ref} className="flex-1 overflow-y-auto p-4 space-y-2">
         {messages.map((msg: Message, index: number) => (
           <div
             key={index}
-            className={`p-3 rounded-lg max-w-xs ${
-              msg.sender === 'user'
-                ? 'bg-blue-500 text-white ml-auto'
-                : 'bg-gray-300 text-gray-800'
-            }`}
+            className={`p-3 max-w-[85.7%] text-sm border
+              ${
+                msg.sender === 'bot'
+                  ? 'bg-[#fff8c6] text-black font-[Comic_Sans_MS,cursive]'
+                  : 'bg-[#f0f0f0] text-black font-[Tahoma,sans-serif]'
+              }
+              border-gray-500
+              shadow-[inset_-1px_-1px_0px_#fff,inset_1px_1px_0px_#808080]
+              whitespace-pre-wrap break-words overflow-visible
+            `}
           >
             {msg.text.startsWith('blob:') ? (
               <a
@@ -196,19 +210,34 @@ const ChatComponent: React.FunctionComponent = () => {
       </div>
 
       {/* Input Box */}
-      <div className="flex items-center p-4 bg-gray-50">
+      <div className="flex items-center gap-2 px-3 py-2 bg-[#d4d0c8] border-t border-gray-600 shadow-[inset_-1px_-1px_0px_#fff,inset_1px_1px_0px_#808080]">
         <input
           type="text"
-          className="flex-1 p-2 border rounded-lg focus:outline-none"
+          className="flex-1 px-2 py-1 bg-white text-black border border-gray-500 shadow-[inset_1px_1px_0px_#fff,inset_-1px_-1px_0px_#808080] outline-none text-sm font-[Tahoma,sans-serif]"
           placeholder="Your answer..."
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleSend()}
         />
-        <button onClick={handleSend} className="ml-2 bg-blue-500 text-white p-2 rounded">
+        <button onClick={handleSend}
+         className="px-4 py-1 bg-[#d4d0c8] text-black border border-gray-600 shadow-[inset_1px_1px_0px_#fff,inset_-1px_-1px_0px_#808080] active:shadow-none text-sm font-[Tahoma,sans-serif]"
+         >
           Send
         </button>
       </div>
+      <img
+      src={
+        clippyState === 'thinking'
+          ? '/clippy/clippy-thinking.png'
+          : clippyState === 'talking'
+          ? '/clippy/clippy-talking.png'
+          : '/clippy/clippy-neutral.png'
+      }
+      alt="Clippy"
+      className="w-48 h-48 fixed bottom-[calc(2rem+60px)] left-[calc(50%-480px)] transition-all drop-shadow-lg"
+      draggable={false}
+    />
+
     </div>
   );
 };

@@ -30,7 +30,7 @@ export const pdfTemplate: Template = {
     {
       name: 'signature',
       type: 'text',
-      position: { x: 10, y: 250 },
+      position: { x: 10, y: 300 },
       width: 190,
       height: 20,
       fontSize: 11,
